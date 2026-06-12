@@ -109,6 +109,15 @@ input[type="text"] {
   transition: border-color 0.2s;
 }
 input:focus { border-color: var(--purple); }
+input[type="number"] {
+  width: 100%; padding: 13px 14px; background: #0e0e0e;
+  border: 1px solid var(--border); border-radius: 9px; color: #fff;
+  font-size: 1.2rem; text-align: center; margin-bottom: 0; outline: none;
+  -moz-appearance: textfield; appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.sw-display { font-size: 2.6rem; font-weight: 300; text-align: center; color: #fff; letter-spacing: 3px; margin: 10px 0 14px; font-variant-numeric: tabular-nums; }
 /* Info boxes */
 .info {
   background: #0e0e0e;
@@ -288,6 +297,38 @@ input:focus { border-color: var(--purple); }
   <button class="btn-green" id="btnWifi" onclick="enviarWifi()" disabled>
     ↑ Conectar reloj a esta WiFi
   </button>
+</div>
+
+<!-- Cronómetro -->
+<div class="card">
+  <div class="card-title">Cronómetro</div>
+  <div class="sw-display" id="swDisplay">00:00.00</div>
+  <div class="row">
+    <button class="btn-green" id="btnSwStart" onclick="swStartStop()">Iniciar</button>
+    <button class="btn-blue"  id="btnSwLap"   onclick="swLap()" style="width:46%;" disabled>Vuelta</button>
+    <button class="btn-red"   id="btnSwReset" onclick="swReset()" style="width:36%;">Reset</button>
+  </div>
+  <div id="swLaps" style="margin-top:8px;max-height:76px;overflow-y:auto;font-size:0.75rem;color:#555;"></div>
+</div>
+
+<!-- Temporizador -->
+<div class="card">
+  <div class="card-title">Temporizador</div>
+  <div class="sw-display" id="timerDisplay" style="color:#fff;">00:00</div>
+  <div class="row" style="gap:10px;margin-bottom:10px;">
+    <div style="flex:1;text-align:center;">
+      <div class="label-sm" style="margin-bottom:4px;">Min</div>
+      <input type="number" id="timerMin" min="0" max="99" value="0">
+    </div>
+    <div style="flex:1;text-align:center;">
+      <div class="label-sm" style="margin-bottom:4px;">Seg</div>
+      <input type="number" id="timerSec" min="0" max="59" value="30">
+    </div>
+  </div>
+  <div class="row">
+    <button class="btn-green" id="btnTimerStart" onclick="timerStartStop()">Iniciar</button>
+    <button class="btn-red"   id="btnTimerReset" onclick="timerReset()" style="width:36%;">Reset</button>
+  </div>
 </div>
 
 <!-- Log -->
@@ -644,6 +685,107 @@ async function enviarWifi() {
 document.getElementById('txtMsg').addEventListener('keydown', e => {
   if (e.key === 'Enter') enviarMensaje();
 });
+
+// ── Cronómetro ────────────────────────────────────────────────────────────
+let swRunning = false, swStartTs = 0, swElapsed = 0, swTick = null, swLapList = [];
+
+function swFmt(ms) {
+  const cs = Math.floor(ms / 10) % 100;
+  const s  = Math.floor(ms / 1000) % 60;
+  const m  = Math.floor(ms / 60000);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+}
+
+function swStartStop() {
+  if (!swRunning) {
+    swStartTs = Date.now() - swElapsed;
+    swTick = setInterval(() => {
+      swElapsed = Date.now() - swStartTs;
+      document.getElementById('swDisplay').textContent = swFmt(swElapsed);
+    }, 33);
+    swRunning = true;
+    document.getElementById('btnSwStart').textContent = 'Pausar';
+    document.getElementById('btnSwStart').className   = 'btn-red';
+    document.getElementById('btnSwLap').disabled = false;
+  } else {
+    clearInterval(swTick);
+    swElapsed = Date.now() - swStartTs;
+    swRunning = false;
+    document.getElementById('btnSwStart').textContent = 'Continuar';
+    document.getElementById('btnSwStart').className   = 'btn-green';
+  }
+}
+
+function swLap() {
+  if (!swRunning) return;
+  swLapList.push(swFmt(Date.now() - swStartTs));
+  const box = document.getElementById('swLaps');
+  box.innerHTML = swLapList.map((l, i) => `<div>V${i+1}: ${l}</div>`).join('');
+  box.scrollTop = box.scrollHeight;
+}
+
+function swReset() {
+  clearInterval(swTick);
+  swRunning = false; swElapsed = 0; swLapList = [];
+  document.getElementById('swDisplay').textContent = '00:00.00';
+  document.getElementById('swDisplay').style.color = '#fff';
+  document.getElementById('btnSwStart').textContent = 'Iniciar';
+  document.getElementById('btnSwStart').className   = 'btn-green';
+  document.getElementById('btnSwLap').disabled = true;
+  document.getElementById('swLaps').innerHTML = '';
+}
+
+// ── Temporizador ──────────────────────────────────────────────────────────
+let timerRunning = false, timerEnd = 0, timerRemaining = 0, timerTick = null;
+
+function timerFmt(ms) {
+  const s  = Math.ceil(ms / 1000);
+  const mm = Math.floor(s / 60), ss = s % 60;
+  return `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+}
+
+function timerStartStop() {
+  if (!timerRunning) {
+    if (timerRemaining <= 0) {
+      const m = parseInt(document.getElementById('timerMin').value) || 0;
+      const s = parseInt(document.getElementById('timerSec').value) || 0;
+      timerRemaining = (m * 60 + s) * 1000;
+    }
+    if (timerRemaining <= 0) return;
+    timerEnd = Date.now() + timerRemaining;
+    timerTick = setInterval(() => {
+      timerRemaining = timerEnd - Date.now();
+      if (timerRemaining <= 0) {
+        timerRemaining = 0;
+        clearInterval(timerTick); timerRunning = false;
+        document.getElementById('timerDisplay').textContent = '00:00';
+        document.getElementById('timerDisplay').style.color = 'var(--red)';
+        document.getElementById('btnTimerStart').textContent = 'Iniciar';
+        document.getElementById('btnTimerStart').className   = 'btn-green';
+        return;
+      }
+      document.getElementById('timerDisplay').textContent = timerFmt(timerRemaining);
+    }, 250);
+    timerRunning = true;
+    document.getElementById('timerDisplay').style.color = '#fff';
+    document.getElementById('btnTimerStart').textContent = 'Pausar';
+    document.getElementById('btnTimerStart').className   = 'btn-red';
+  } else {
+    clearInterval(timerTick); timerRunning = false;
+    timerRemaining = timerEnd - Date.now();
+    document.getElementById('btnTimerStart').textContent = 'Continuar';
+    document.getElementById('btnTimerStart').className   = 'btn-green';
+  }
+}
+
+function timerReset() {
+  clearInterval(timerTick);
+  timerRunning = false; timerRemaining = 0;
+  document.getElementById('timerDisplay').textContent = '00:00';
+  document.getElementById('timerDisplay').style.color = '#fff';
+  document.getElementById('btnTimerStart').textContent = 'Iniciar';
+  document.getElementById('btnTimerStart').className   = 'btn-green';
+}
 </script>
 </body>
 </html>
