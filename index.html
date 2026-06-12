@@ -210,6 +210,86 @@ input:focus { border-color: var(--purple); }
   <div class="info" id="lblEstado">-</div>
 </div>
 
+<!-- Wazuh Manager enrollment -->
+<div class="card">
+  <div class="card-title">Enrollar Wazuh Manager</div>
+  <p style="font-size:0.75rem;color:#666;margin-bottom:10px;">
+    Guarda un manager en el reloj (hasta 4). Las credenciales se cifran en el vault.
+    Desde el reloj podrás conectar, listar agentes, reiniciarlos y ejecutar active response.
+  </p>
+  <label class="label-sm">Nombre / tag del manager</label>
+  <input type="text" id="txtMgrName" placeholder="Prod-Manager" maxlength="46" autocomplete="off">
+  <label class="label-sm">URL (https://host:55000)</label>
+  <input type="text" id="txtMgrUrl" placeholder="https://192.168.1.10:55000" maxlength="126" autocomplete="off" spellcheck="false">
+  <label class="label-sm">Usuario</label>
+  <input type="text" id="txtMgrUser" placeholder="admin" maxlength="62" autocomplete="off">
+  <label class="label-sm">Contraseña</label>
+  <input type="password" id="txtMgrPass" placeholder="Contraseña" maxlength="62" autocomplete="new-password">
+  <button class="btn-purple" id="btnMgr" onclick="enrollMgr()" disabled>
+    ↑ Guardar manager en reloj
+  </button>
+  <div class="info" id="mgrResult" style="margin-top:8px;">-</div>
+</div>
+
+<!-- Wazuh Indexer enrollment -->
+<div class="card">
+  <div class="card-title">Enrollar Wazuh Indexer</div>
+  <p style="font-size:0.75rem;color:#666;margin-bottom:10px;">
+    Las credenciales se envían en un único sentido (teléfono → reloj) y se guardan cifradas.
+    El reloj prueba la conexión automáticamente y confirma el resultado.
+  </p>
+  <label class="label-sm">Nombre / tag del indexer</label>
+  <input type="text" id="txtIdxName" placeholder="Prod-Indexer" maxlength="46" autocomplete="off">
+  <label class="label-sm">URL (https://host:9200)</label>
+  <input type="text" id="txtIdxUrl" placeholder="https://192.168.1.10:9200" maxlength="126" autocomplete="off" spellcheck="false">
+  <label class="label-sm">Usuario</label>
+  <input type="text" id="txtIdxUser" placeholder="admin" maxlength="62" autocomplete="off">
+  <label class="label-sm">Contraseña</label>
+  <input type="password" id="txtIdxPass" placeholder="Contraseña" maxlength="62" autocomplete="new-password">
+  <button class="btn-purple" id="btnIdx" onclick="enrollIdx()" disabled>
+    ↑ Enrollar en reloj y probar conexión
+  </button>
+  <div class="info" id="idxResult" style="margin-top:8px;">-</div>
+</div>
+
+<!-- WireGuard VPN upload -->
+<div class="card">
+  <div class="card-title">Subir VPN WireGuard</div>
+  <p style="font-size:0.75rem;color:#666;margin-bottom:10px;">
+    Sube archivos .conf de WireGuard al reloj. Puedes guardar hasta 4 configuraciones.
+    Selecciona la VPN activa desde el menú del reloj.
+  </p>
+  <label class="label-sm">Nombre para esta VPN</label>
+  <input type="text" id="txtVpnName" placeholder="HomeVPN" maxlength="30" autocomplete="off">
+  <label class="label-sm">Archivo .conf</label>
+  <input type="file" id="fileVpn" accept=".conf,.txt" style="
+    width:100%;padding:10px;background:#0e0e0e;border:1px solid #252525;
+    border-radius:9px;color:#aaa;font-size:0.85rem;margin-bottom:10px;">
+  <div id="vpnPreview" class="info" style="font-family:monospace;font-size:0.7rem;display:none;max-height:100px;overflow:auto;word-break:break-all;"></div>
+  <button class="btn-green" id="btnVpnUpload" onclick="subirVpn()" disabled>
+    ↑ Subir config al reloj
+  </button>
+  <div class="info" id="vpnResult" style="margin-top:8px;">-</div>
+  <div class="label-sm" id="vpnListLabel" style="display:none;">Guardadas en reloj</div>
+  <div id="vpnList" style="margin-top:4px;"></div>
+</div>
+
+<!-- WiFi al reloj -->
+<div class="card">
+  <div class="card-title">Pasar WiFi al reloj</div>
+  <p style="font-size:0.75rem;color:#666;margin-bottom:10px;">
+    Introduce las credenciales de la red WiFi a la que quieres conectar el reloj.
+    Se guardará en el reloj y reconectará automáticamente al arrancar.
+  </p>
+  <label class="label-sm">Nombre de red (SSID)</label>
+  <input type="text" id="txtSSID" placeholder="MiRed_5GHz" maxlength="63" autocomplete="off" spellcheck="false">
+  <label class="label-sm">Contraseña WiFi</label>
+  <input type="password" id="txtWifiPass" placeholder="Contraseña" maxlength="63" autocomplete="new-password">
+  <button class="btn-green" id="btnWifi" onclick="enviarWifi()" disabled>
+    ↑ Conectar reloj a esta WiFi
+  </button>
+</div>
+
 <!-- Log -->
 <div class="card">
   <div class="card-title">Log</div>
@@ -219,15 +299,23 @@ input:focus { border-color: var(--purple); }
 <script>
 // ── UUIDs ─────────────────────────────────────────────────────────────────
 const SVC  = '1234fff0-1234-1234-1234-123456789abc';
-const T_CH = '1234fff1-1234-1234-1234-123456789abc';  // TIME  (write)
-const M_CH = '1234fff2-1234-1234-1234-123456789abc';  // MSG   (write)
-const S_CH = '1234fff3-1234-1234-1234-123456789abc';  // STATUS (read)
+const T_CH = '1234fff1-1234-1234-1234-123456789abc';  // TIME    (write)
+const M_CH = '1234fff2-1234-1234-1234-123456789abc';  // MSG     (write + notify ← watch)
+const S_CH = '1234fff3-1234-1234-1234-123456789abc';  // STATUS  (read)
+const W_CH = '1234fff4-1234-1234-1234-123456789abc';  // WIFI    (write)
+const I_CH = '1234fff5-1234-1234-1234-123456789abc';  // INDEXER (write)
+const V_CH = '1234fff6-1234-1234-1234-123456789abc';  // VPN     (write, chunked)
+const G_CH = '1234fff7-1234-1234-1234-123456789abc';  // MGR     (write, manager)
 
 // ── State ─────────────────────────────────────────────────────────────────
 let device   = null;
 let timeChar = null;
 let msgChar  = null;
 let statChar = null;
+let wifiChar = null;
+let idxChar  = null;
+let vpnChar  = null;
+let mgrChar  = null;
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -266,7 +354,7 @@ function setConnected(on) {
   document.getElementById('lblConn').textContent = on ? '✓ Conectado a ciberreloj' : 'Desconectado';
   document.getElementById('btnConn').disabled    = on;
   document.getElementById('btnDisc').disabled    = !on;
-  ['btnHora','btnEnviar','btnEstado'].forEach(id =>
+  ['btnHora','btnEnviar','btnEstado','btnWifi','btnMgr','btnIdx','btnVpnUpload'].forEach(id =>
     document.getElementById(id).disabled = !on);
 }
 
@@ -289,7 +377,7 @@ async function conectar() {
     device.addEventListener('gattserverdisconnected', () => {
       log('Reloj desconectado', 'err');
       setConnected(false);
-      timeChar = msgChar = statChar = null;
+      timeChar = msgChar = statChar = wifiChar = idxChar = vpnChar = mgrChar = null;
     });
 
     log('Conectando...', 'info');
@@ -299,6 +387,14 @@ async function conectar() {
     timeChar = await service.getCharacteristic(T_CH);
     msgChar  = await service.getCharacteristic(M_CH);
     statChar = await service.getCharacteristic(S_CH);
+    wifiChar = await service.getCharacteristic(W_CH);
+    idxChar  = await service.getCharacteristic(I_CH);
+    vpnChar  = await service.getCharacteristic(V_CH);
+    mgrChar  = await service.getCharacteristic(G_CH);
+
+    // Subscribe to watch→phone notifications (results for IDX/VPN/MSG)
+    msgChar.addEventListener('characteristicvaluechanged', onWatchNotif);
+    await msgChar.startNotifications();
 
     setConnected(true);
     log('Conectado correctamente', 'ok');
@@ -316,8 +412,46 @@ async function conectar() {
 async function desconectar() {
   if (device && device.gatt.connected) device.gatt.disconnect();
   setConnected(false);
-  timeChar = msgChar = statChar = null;
+  timeChar = msgChar = statChar = wifiChar = idxChar = vpnChar = mgrChar = null;
   log('Desconectado manualmente', 'info');
+}
+
+// Watch → phone notifications handler
+function onWatchNotif(e) {
+  const text = dec.decode(e.target.value);
+  const type = text.startsWith('IDX:') || text.startsWith('VPN:') ? 'info' : '';
+  log('↩ Reloj: ' + text, text.includes(':ok') ? 'ok' : text.includes(':err') ? 'err' : type);
+  // Update IDX status panel if result is for indexer
+  if (text.startsWith('IDX:')) {
+    const parts = text.split(':');
+    const name = parts[1], result = parts[2];
+    const box = document.getElementById('idxResult');
+    if (box) {
+      box.textContent = result === 'ok' ? `✓ "${name}" enrollado correctamente` : `✗ Error enrollando "${name}"`;
+      box.className   = 'info ' + (result === 'ok' ? 'highlight' : 'err');
+    }
+  }
+  if (text.startsWith('MGR:')) {
+    const parts = text.split(':');
+    const name = parts[1], result = parts[2];
+    const box = document.getElementById('mgrResult');
+    if (box) {
+      box.textContent = result === 'ok' ? `✓ "${name}" guardado en reloj` :
+                        result === 'full' ? '✗ Sin espacio — máximo 4 managers' :
+                        `✗ Error guardando "${name}"`;
+      box.className   = 'info ' + (result === 'ok' ? 'highlight' : 'err');
+    }
+  }
+  if (text.startsWith('VPN:')) {
+    const parts = text.split(':');
+    const name = parts[1], result = parts[2];
+    const box = document.getElementById('vpnResult');
+    if (box) {
+      box.textContent = result === 'ok' ? `✓ Config "${name}" guardada en reloj` : `✗ Error: ${parts.slice(3).join(':')}`;
+      box.className   = 'info ' + (result === 'ok' ? 'highlight' : '');
+      if (result === 'ok') addVpnToList(name);
+    }
+  }
 }
 
 async function _syncHora() {
@@ -359,6 +493,150 @@ async function leerEstado() {
     log('Estado: ' + text, 'ok');
   } catch (e) {
     log('Error estado: ' + e.message, 'err');
+  }
+}
+
+// ── Wazuh Manager enrollment ─────────────────────────────────────────────
+async function enrollMgr() {
+  const name = document.getElementById('txtMgrName').value.trim();
+  const url  = document.getElementById('txtMgrUrl').value.trim();
+  const user = document.getElementById('txtMgrUser').value.trim();
+  const pass = document.getElementById('txtMgrPass').value;
+  if (!name || !url || !user) { log('Rellena nombre, URL y usuario', 'err'); return; }
+  if (!mgrChar) { log('No conectado', 'err'); return; }
+  try {
+    // Format: name\x1Furl\x1Fuser\x1Fpass  (one-way, credentials never returned)
+    const payload = name + '\x1f' + url + '\x1f' + user + '\x1f' + pass;
+    if (payload.length > 320) { log('Datos demasiado largos', 'err'); return; }
+    await mgrChar.writeValue(enc.encode(payload));
+    document.getElementById('mgrResult').textContent = 'Enviado — esperando confirmación del reloj...';
+    document.getElementById('mgrResult').className = 'info';
+    document.getElementById('txtMgrPass').value = '';
+    log(`MGR "${name}" enviado al reloj...`, 'info');
+  } catch (e) {
+    log('Error MGR: ' + e.message, 'err');
+  }
+}
+
+// ── Wazuh Indexer enrollment ──────────────────────────────────────────────
+async function enrollIdx() {
+  const name = document.getElementById('txtIdxName').value.trim();
+  const url  = document.getElementById('txtIdxUrl').value.trim();
+  const user = document.getElementById('txtIdxUser').value.trim();
+  const pass = document.getElementById('txtIdxPass').value;
+  if (!name || !url || !user) { log('Rellena nombre, URL y usuario', 'err'); return; }
+  if (!idxChar) { log('No conectado', 'err'); return; }
+  try {
+    // Format: name\x1Furl\x1Fuser\x1Fpass  (one-way, credentials never returned)
+    const payload = name + '\x1f' + url + '\x1f' + user + '\x1f' + pass;
+    if (payload.length > 300) { log('Datos demasiado largos', 'err'); return; }
+    await idxChar.writeValue(enc.encode(payload));
+    document.getElementById('idxResult').textContent = 'Enviado — esperando confirmación del reloj...';
+    document.getElementById('idxResult').className = 'info';
+    document.getElementById('txtIdxPass').value = '';
+    log(`IDX "${name}" enviado, probando conexión...`, 'info');
+  } catch (e) {
+    log('Error IDX: ' + e.message, 'err');
+  }
+}
+
+// ── WireGuard VPN upload ──────────────────────────────────────────────────
+const vpnNames = new Set();
+
+function addVpnToList(name) {
+  vpnNames.add(name);
+  const list = document.getElementById('vpnList');
+  const lbl  = document.getElementById('vpnListLabel');
+  lbl.style.display = 'block';
+  list.innerHTML = '';
+  vpnNames.forEach(n => {
+    const d = document.createElement('div');
+    d.className = 'info';
+    d.style.cssText = 'margin-bottom:4px;color:#00dd00;font-size:0.8rem;';
+    d.textContent = '✓ ' + n;
+    list.appendChild(d);
+  });
+}
+
+document.getElementById('fileVpn').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const content = ev.target.result;
+    const preview = document.getElementById('vpnPreview');
+    preview.textContent = content.substring(0, 600) + (content.length > 600 ? '...' : '');
+    preview.style.display = 'block';
+    // Auto-fill name from filename (remove .conf extension)
+    const nameField = document.getElementById('txtVpnName');
+    if (!nameField.value) nameField.value = file.name.replace(/\.conf$/i, '').substring(0, 30);
+  };
+  reader.readAsText(file);
+});
+
+async function subirVpn() {
+  const name = document.getElementById('txtVpnName').value.trim();
+  const fileInput = document.getElementById('fileVpn');
+  if (!name) { log('Pon un nombre a la VPN', 'err'); return; }
+  if (!fileInput.files[0]) { log('Selecciona un archivo .conf', 'err'); return; }
+  if (!vpnChar) { log('No conectado', 'err'); return; }
+
+  const conf = await fileInput.files[0].text();
+  if (conf.length > 1500) { log(`Config demasiado grande (${conf.length} bytes, máx 1500)`, 'err'); return; }
+
+  try {
+    const CHUNK = 470;
+    const header  = 'VS:' + name + '\x1f';
+    const dataLen = conf.length;
+
+    if (header.length + dataLen <= CHUNK) {
+      // Single write
+      await vpnChar.writeValue(enc.encode(header + conf));
+      // Send VE: to signal end
+      await new Promise(r => setTimeout(r, 80));
+      await vpnChar.writeValue(enc.encode('VE:'));
+    } else {
+      // Chunked: first packet = VS: header + first chunk
+      const first = conf.substring(0, CHUNK - header.length);
+      await vpnChar.writeValue(enc.encode(header + first));
+      let offset = first.length;
+      while (offset < dataLen) {
+        await new Promise(r => setTimeout(r, 80));
+        const chunk = conf.substring(offset, offset + CHUNK - 3);
+        const remaining = dataLen - offset - chunk.length;
+        const prefix = remaining <= 0 ? 'VE:' : 'VC:';
+        await vpnChar.writeValue(enc.encode(prefix + chunk));
+        offset += chunk.length;
+        if (remaining <= 0) break;
+      }
+      if (offset >= dataLen) {
+        // All data sent in VC chunks — send final VE: marker
+        await new Promise(r => setTimeout(r, 80));
+        await vpnChar.writeValue(enc.encode('VE:'));
+      }
+    }
+
+    document.getElementById('vpnResult').textContent = `"${name}" enviado — esperando confirmación...`;
+    document.getElementById('vpnResult').className = 'info';
+    log(`VPN "${name}" enviada (${conf.length} bytes)`, 'info');
+  } catch (e) {
+    log('Error VPN: ' + e.message, 'err');
+  }
+}
+
+async function enviarWifi() {
+  const ssid = document.getElementById('txtSSID').value.trim();
+  const pass = document.getElementById('txtWifiPass').value;
+  if (!ssid) { log('Introduce el nombre de red (SSID)', 'err'); return; }
+  if (!wifiChar) { log('No conectado al reloj', 'err'); return; }
+  try {
+    // Format: "SSID\x1Fpassword"  (0x1F = ASCII Unit Separator, safe in any SSID/pass)
+    const payload = ssid + '\x1f' + pass;
+    await wifiChar.writeValue(enc.encode(payload));
+    log('WiFi enviado al reloj: "' + ssid + '" – conectando...', 'ok');
+    document.getElementById('txtWifiPass').value = '';
+  } catch (e) {
+    log('Error WiFi: ' + e.message, 'err');
   }
 }
 
