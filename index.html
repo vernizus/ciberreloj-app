@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>ciberreloj</title>
+<style>
+:root {
+  --purple: #8800ff;
+  --dpurple: #440088;
+  --bg: #080808;
+  --card: #141414;
+  --border: #252525;
+  --text: #ffffff;
+  --gray: #777777;
+  --green: #00dd00;
+  --red: #ff3333;
+  --blue: #0088ff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 12px 14px 32px;
+}
+h1 {
+  color: var(--purple);
+  font-size: 1.8rem;
+  text-align: center;
+  padding: 20px 0 4px;
+  letter-spacing: 3px;
+  font-weight: 700;
+}
+.sub {
+  text-align: center;
+  color: var(--gray);
+  font-size: 0.78rem;
+  margin-bottom: 22px;
+  letter-spacing: 1px;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.card-title {
+  font-size: 0.7rem;
+  color: var(--purple);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 12px;
+  font-weight: 600;
+}
+/* Status row */
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--gray);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.dot.on  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.dot.err { background: var(--red); }
+#lblConn { font-size: 0.9rem; color: var(--gray); }
+/* Buttons */
+button {
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.1s, opacity 0.2s;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+button:last-child { margin-bottom: 0; }
+button:active { transform: scale(0.97); }
+button:disabled { opacity: 0.3; cursor: default; transform: none; }
+.btn-purple { background: var(--purple);  color: #fff; }
+.btn-green  { background: #003300; color: var(--green); border: 1px solid #005500; }
+.btn-red    { background: #2a0000; color: var(--red);   border: 1px solid #440000; }
+.btn-blue   { background: #001a33; color: var(--blue);  border: 1px solid #003366; }
+.row { display: flex; gap: 8px; }
+.row button { margin-bottom: 0; }
+/* Inputs */
+input[type="text"] {
+  width: 100%;
+  padding: 13px 14px;
+  background: #0e0e0e;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: #fff;
+  font-size: 0.95rem;
+  margin-bottom: 10px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+input:focus { border-color: var(--purple); }
+/* Info boxes */
+.info {
+  background: #0e0e0e;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: var(--gray);
+  min-height: 38px;
+  word-break: break-all;
+  margin-top: 8px;
+}
+.info.highlight { color: var(--green); }
+.label-sm {
+  font-size: 0.7rem;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+/* Clock */
+#clock {
+  font-size: 2.4rem;
+  font-weight: 300;
+  text-align: center;
+  color: #fff;
+  letter-spacing: 2px;
+  margin: 6px 0 12px;
+}
+#date {
+  text-align: center;
+  color: var(--gray);
+  font-size: 0.82rem;
+  margin-bottom: 14px;
+}
+/* Log */
+#logBox {
+  font-size: 0.75rem;
+  max-height: 130px;
+  overflow-y: auto;
+}
+#logBox div {
+  padding: 3px 0;
+  border-bottom: 1px solid #1a1a1a;
+  color: #444;
+}
+#logBox div.ok   { color: var(--green); }
+#logBox div.err  { color: var(--red); }
+#logBox div.info { color: var(--blue); }
+</style>
+</head>
+<body>
+
+<h1>vernizus</h1>
+<p class="sub">companion app · ciberreloj</p>
+
+<!-- Conexión -->
+<div class="card">
+  <div class="card-title">Conexión BLE</div>
+  <div class="status-row">
+    <div class="dot" id="dot"></div>
+    <span id="lblConn">Desconectado</span>
+  </div>
+  <div class="row">
+    <button class="btn-purple" id="btnConn" onclick="conectar()">Conectar reloj</button>
+    <button class="btn-red" id="btnDisc" onclick="desconectar()" disabled
+            style="width:52px;padding:14px 0;flex-shrink:0;">✕</button>
+  </div>
+</div>
+
+<!-- Hora -->
+<div class="card">
+  <div class="card-title">Hora del móvil</div>
+  <div id="clock">--:--:--</div>
+  <div id="date">...</div>
+  <button class="btn-green" id="btnHora" onclick="sincronizarHora()" disabled>
+    ↑ Sincronizar hora al reloj
+  </button>
+  <p class="label-sm">La hora se sincroniza automáticamente al conectar</p>
+</div>
+
+<!-- Mensaje -->
+<div class="card">
+  <div class="card-title">Enviar mensaje al reloj</div>
+  <input type="text" id="txtMsg" placeholder="Escribe un mensaje..." maxlength="64">
+  <button class="btn-purple" id="btnEnviar" onclick="enviarMensaje()" disabled>
+    Enviar mensaje
+  </button>
+</div>
+
+<!-- Estado del reloj -->
+<div class="card">
+  <div class="card-title">Estado del reloj</div>
+  <button class="btn-blue" id="btnEstado" onclick="leerEstado()" disabled>
+    Leer estado del reloj
+  </button>
+  <div class="label-sm">Respuesta</div>
+  <div class="info" id="lblEstado">-</div>
+</div>
+
+<!-- Log -->
+<div class="card">
+  <div class="card-title">Log</div>
+  <div id="logBox"></div>
+</div>
+
+<script>
+// ── UUIDs ─────────────────────────────────────────────────────────────────
+const SVC  = '1234fff0-1234-1234-1234-123456789abc';
+const T_CH = '1234fff1-1234-1234-1234-123456789abc';  // TIME  (write)
+const M_CH = '1234fff2-1234-1234-1234-123456789abc';  // MSG   (write)
+const S_CH = '1234fff3-1234-1234-1234-123456789abc';  // STATUS (read)
+
+// ── State ─────────────────────────────────────────────────────────────────
+let device   = null;
+let timeChar = null;
+let msgChar  = null;
+let statChar = null;
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+// ── Clock display ─────────────────────────────────────────────────────────
+const DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+function actualizarReloj() {
+  const n = new Date();
+  const hh = String(n.getHours()).padStart(2,'0');
+  const mm = String(n.getMinutes()).padStart(2,'0');
+  const ss = String(n.getSeconds()).padStart(2,'0');
+  document.getElementById('clock').textContent = `${hh}:${mm}:${ss}`;
+  document.getElementById('date').textContent  =
+    `${DIAS[n.getDay()]} ${n.getDate()} ${MESES[n.getMonth()]} ${n.getFullYear()}`;
+}
+setInterval(actualizarReloj, 1000);
+actualizarReloj();
+
+// ── Log ───────────────────────────────────────────────────────────────────
+function log(msg, type = '') {
+  const box = document.getElementById('logBox');
+  const d   = document.createElement('div');
+  d.className = type;
+  const t = new Date().toLocaleTimeString('es-ES');
+  d.textContent = `${t}  ${msg}`;
+  box.prepend(d);
+  // keep max 30 entries
+  while (box.children.length > 30) box.removeChild(box.lastChild);
+}
+
+// ── UI state ──────────────────────────────────────────────────────────────
+function setConnected(on) {
+  const dot = document.getElementById('dot');
+  dot.className = 'dot' + (on ? ' on' : '');
+  document.getElementById('lblConn').textContent = on ? '✓ Conectado a ciberreloj' : 'Desconectado';
+  document.getElementById('btnConn').disabled    = on;
+  document.getElementById('btnDisc').disabled    = !on;
+  ['btnHora','btnEnviar','btnEstado'].forEach(id =>
+    document.getElementById(id).disabled = !on);
+}
+
+// ── BLE ───────────────────────────────────────────────────────────────────
+async function conectar() {
+  if (!navigator.bluetooth) {
+    log('Web Bluetooth no disponible. Usa Chrome en Android.', 'err');
+    alert('Web Bluetooth no disponible.\nAbre esta página en Chrome en Android.');
+    return;
+  }
+  try {
+    log('Buscando ciberreloj...', 'info');
+    document.getElementById('lblConn').textContent = 'Buscando...';
+
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'ciberreloj' }],
+      optionalServices: [SVC]
+    });
+
+    device.addEventListener('gattserverdisconnected', () => {
+      log('Reloj desconectado', 'err');
+      setConnected(false);
+      timeChar = msgChar = statChar = null;
+    });
+
+    log('Conectando...', 'info');
+    document.getElementById('lblConn').textContent = 'Conectando...';
+    const server  = await device.gatt.connect();
+    const service = await server.getPrimaryService(SVC);
+    timeChar = await service.getCharacteristic(T_CH);
+    msgChar  = await service.getCharacteristic(M_CH);
+    statChar = await service.getCharacteristic(S_CH);
+
+    setConnected(true);
+    log('Conectado correctamente', 'ok');
+
+    // Auto-sync hora al conectar
+    await _syncHora();
+
+  } catch (e) {
+    document.getElementById('dot').className = 'dot err';
+    document.getElementById('lblConn').textContent = 'Error de conexión';
+    log('Error: ' + e.message, 'err');
+  }
+}
+
+async function desconectar() {
+  if (device && device.gatt.connected) device.gatt.disconnect();
+  setConnected(false);
+  timeChar = msgChar = statChar = null;
+  log('Desconectado manualmente', 'info');
+}
+
+async function _syncHora() {
+  if (!timeChar) return;
+  const ts = String(Math.floor(Date.now() / 1000));
+  await timeChar.writeValue(enc.encode(ts));
+  log('Hora sincronizada → ' + new Date().toLocaleTimeString('es-ES'), 'ok');
+}
+
+async function sincronizarHora() {
+  try {
+    await _syncHora();
+  } catch (e) {
+    log('Error sync hora: ' + e.message, 'err');
+  }
+}
+
+async function enviarMensaje() {
+  const txt = document.getElementById('txtMsg').value.trim();
+  if (!txt) return;
+  if (!msgChar) { log('No conectado', 'err'); return; }
+  try {
+    await msgChar.writeValue(enc.encode(txt));
+    log('Mensaje enviado: "' + txt + '"', 'ok');
+    document.getElementById('txtMsg').value = '';
+  } catch (e) {
+    log('Error mensaje: ' + e.message, 'err');
+  }
+}
+
+async function leerEstado() {
+  if (!statChar) return;
+  try {
+    const val  = await statChar.readValue();
+    const text = dec.decode(val);
+    const box  = document.getElementById('lblEstado');
+    box.textContent  = text;
+    box.className    = 'info highlight';
+    log('Estado: ' + text, 'ok');
+  } catch (e) {
+    log('Error estado: ' + e.message, 'err');
+  }
+}
+
+// Enviar con Enter
+document.getElementById('txtMsg').addEventListener('keydown', e => {
+  if (e.key === 'Enter') enviarMensaje();
+});
+</script>
+</body>
+</html>
